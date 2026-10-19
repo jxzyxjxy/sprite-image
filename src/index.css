@@ -1,21 +1,99 @@
+@import url('https://fonts.googleapis.cn/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  color-scheme: dark;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html,
+body,
+#app {
+  height: 100%;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: #09090b;
+  color: #f4f4f5;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overscroll-behavior: none;
+}
+
+/* 细滚动条，贴近仪器面板质感 */
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: #2b2b30;
+  border-radius: 9999px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: #3f3f46;
+}
+
+*::-webkit-scrollbar-track {
+  background-color: transparent;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #2b2b30 transparent;
+}
+
+/* 棋盘格：缩略图透明底 */
+.checkerboard {
+  background-color: #151619;
+  background-image: repeating-conic-gradient(#1e2024 0% 25%, #151619 0% 50%);
+  background-size: 12px 12px;
+}
+
+/* 滑杆：琥珀信号灯色手柄 */
+.slider {
+  appearance: none;
+  height: 4px;
+  border-radius: 9999px;
+  background-color: #27272a;
+  outline: none;
+  cursor: pointer;
+}
+
+.slider::-webkit-slider-thumb {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 9999px;
+  background-color: #fbbf24;
+  border: 2px solid #09090b;
+  box-shadow: 0 0 0 1px #52525b;
+  transition: transform 120ms ease-out;
+}
+
+.slider::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+}
+
+.slider::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 9999px;
+  background-color: #fbbf24;
+  border: 2px solid #09090b;
+  box-shadow: 0 0 0 1px #52525b;
+}
+
+.slider::-moz-range-track {
+  height: 4px;
+  border-radius: 9999px;
+  background-color: #27272a;
+}
+
+.slider:disabled {
+  cursor: not-allowed;
 }

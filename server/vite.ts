@@ -15,6 +15,9 @@ const isDev = process.env.COZE_PROJECT_ENV !== 'PROD';
  */
 export async function setupViteMiddleware(app: Application) {
   const vite = await createViteServer({
+    // 已通过 import 取得完整配置（含插件），禁止 Vite 再次加载 vite.config.ts，
+    // 否则插件会被重复注册（react-refresh 代码重复注入导致模块转换失败）
+    configFile: false,
     ...viteConfig,
     server: {
       ...viteConfig.server,
