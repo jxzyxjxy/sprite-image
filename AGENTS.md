@@ -1,70 +1,51 @@
 # 项目上下文
 
-SpriteForge — 纯前端雪碧图（Sprite Sheet）生成工具。多图上传 → 自动排版合并 → Canvas 实时预览 → 导出 PNG + TexturePacker JSON Hash（兼容 Phaser / PixiJS / Cocos Creator）。图片全部在浏览器本地处理，不上传服务器。
+sprite-sheet-tool — 纯前端雪碧图（Sprite Sheet）生成工具。多图上传 → 自动排版合并 → 实时预览 → 导出 PNG + TexturePacker JSON Hash（兼容 Phaser / PixiJS / Cocos）。图片全部在浏览器本地处理，不上传服务器。
 
 ## 技术栈
 
-- **核心**: React 19, Vite 7, TypeScript, Express（仅托管前端与 Vite 中间件，无业务 API）
-- **UI**: Tailwind CSS 3, lucide-react 图标
-- **设计规范**: 见 `DESIGN.md`（深色仪器风工作台，任何 UI 改动前先阅读）
+- **核心**: React 19, Vite 7, TypeScript 5, Express（仅托管前端与 Vite 中间件，无业务 API）
+- **样式**: 原生 CSS（`src/index.css` CSS 变量 + `src/App.css`），设计规范见 `DESIGN.md`
+- **构建**: `vite build`（前端 → dist/）+ `tsup`（服务端 → dist-server/）
 
 ## 目录结构
 
 ```
 ├── scripts/            # 构建与启动脚本（coze 脚手架预置）
-│   ├── build.sh        # 构建脚本
-│   ├── dev.sh          # 开发环境启动脚本
-│   ├── prepare.sh      # 预处理脚本
-│   └── start.sh        # 生产环境启动脚本
-├── server/             # 服务端逻辑
-│   ├── routes/         # API 路由（仅 /api/health）
-│   ├── server.ts       # Express 服务入口
-│   └── vite.ts         # Vite 中间件集成（createViteServer 必须 configFile:false，见注释）
-├── src/                # 前端源码
-│   ├── main.tsx        # React 入口
-│   ├── App.tsx         # 主组件：状态管理、全局拖拽上传、导出调度
-│   ├── index.css       # 全局样式（字体引入、滚动条、棋盘格、滑杆）
-│   ├── types/sprite.ts # 核心类型：SpriteImage / PackSettings / PackResult 等
-│   ├── lib/
-│   │   ├── imageLoader.ts  # 文件过滤、SVG 固有尺寸补齐、透明边缘裁剪、文件名去重
-│   │   ├── packing.ts      # 排版算法：Shelf Packing（紧凑）与 Grid（网格）、2 幂对齐
-│   │   └── exporter.ts     # 雪碧图渲染、TexturePacker JSON 生成、下载触发
-│   └── components/
-│       ├── Toolbar.tsx        # 顶部工具栏（统计 + 导出按钮）
-│       ├── ImageListPanel.tsx # 左侧素材列表（缩略图/删除/清空，hover 联动高亮）
-│       ├── SettingsPanel.tsx  # 右侧设置面板（排版/优化/输出）
-│       ├── PreviewCanvas.tsx  # 中央画布预览（棋盘格、滚轮缩放、拖拽平移、帧高亮）
-│       └── controls.tsx       # 共享控件（Switch/Slider/SegmentedControl/IconButton）
-├── index.html          # 入口 HTML（脚本指向 /src/main.tsx）
-├── DESIGN.md           # 视觉与交互设计规范
-├── package.json        # 项目依赖管理
-├── tsconfig.json       # TypeScript 配置（moduleResolution: bundler, jsx: react-jsx）
-└── vite.config.ts      # Vite 配置（@vitejs/plugin-react@5，兼容 Vite 7）
+├── server/             # Express 服务（routes/ 仅 /api/health；vite.ts 集成 Vite 中间件）
+├── src/
+│   ├── main.tsx        # React 入口（#root）
+│   ├── App.tsx         # 主组件：图片列表状态、设置状态、防抖 120ms 自动重新生成
+│   ├── App.css         # 布局与各组件样式
+│   ├── index.css       # CSS 变量（设计 tokens）、全局 reset、滚动条
+│   ├── types.ts        # ImageItem / SheetSettings / PlacedFrame / SheetResult 等类型
+│   ├── components/     # DropZone / ImageList / SettingsPanel / PreviewPanel
+│   └── utils/
+│       ├── packer.ts       # 排版算法：Shelf（紧凑，按高度降序）与 Grid（网格，可设列数）、2 幂对齐
+│       ├── spritesheet.ts  # 透明边缘裁剪（alpha>8 扫描）、画布合成、TexturePacker JSON 生成
+│       └── download.ts     # Blob 下载触发
+├── index.html          # 入口（script 指向 /src/main.tsx）
+├── vite.config.ts      # plugins:[react()] + base:'./' + 沙箱 server 配置（端口 5000 / HMR 6000）
+├── tsconfig.json       # 仅 include src（strict + noUnusedLocals）；vite.config.ts 由 tsconfig.node.json 覆盖
+└── DESIGN.md           # 视觉与交互设计规范
 ```
 
 ## 包管理规范
 
-**仅允许使用 pnpm** 作为包管理器，**严禁使用 npm 或 yarn**。
-**常用命令**：
-- 安装依赖：`pnpm add <package>`
-- 安装开发依赖：`pnpm add -D <package>`
-- 安装所有依赖：`pnpm install`
-- 移除依赖：`pnpm remove <package>`
+**仅允许使用 pnpm**（`preinstall` 已拦截 npm/yarn）。常用命令：`pnpm add <pkg>` / `pnpm add -D <pkg>` / `pnpm install` / `pnpm remove <pkg>`。
 
 ## 开发规范
 
-- 使用 Tailwind CSS 进行样式开发；度量/数字/文件名统一 `font-mono`（JetBrains Mono）。
-- 主强调色 amber-400，背景 zinc-950，发丝边框 zinc-800；禁止渐变与发光（详见 DESIGN.md）。
-
-### 编码规范
-
-- 默认按 TypeScript `strict` 心智写代码；优先复用当前作用域已声明的变量、函数、类型和导入，禁止引用未声明标识符或拼错变量名。
-- 禁止隐式 `any` 和 `as any`；函数参数、返回值、解构项、事件对象、Express `req`/`res`、`catch` 错误在使用前应有明确类型或先完成类型收窄，并清理未使用的变量和导入。
-- 类型导入使用 `import type`；React 19 无需默认导入 React。
+- 样式使用原生 CSS + `src/index.css` 中的 CSS 变量，新增组件样式写入 `src/App.css`。
+- TypeScript strict + `noUnusedLocals/noUnusedParameters`；类型导入用 `import type`。
+- 帧键为去重后文件名（`a.png` → `a-1.png`），与 TexturePacker JSON Hash 的 `frames` 键一致。
 
 ### 关键实现约定
 
-- 图片处理后帧键为去重后的文件名（`a.png`, `a (1).png`），与 TexturePacker JSON Hash 的 `frames` 键一致。
-- `spriteSourceSize` = 裁剪区域在原图中的位置；`frame` = 图块在雪碧图中的位置；网格模式下图块在单元格内居中只影响 `frame`。
-- 修改 `vite.config.ts` 或 `server/` 后需重启开发服务（`bash scripts/dev.sh`，脚本会自行清理端口）。
-- 服务端全局错误处理器必须保持 4 参签名 `(err, req, res, next)`，否则 Express 会将其视为普通中间件。
+- 图片/设置变更后防抖 120ms 自动重新排版生成（`App.tsx` useEffect）。
+- 裁剪：`spritesheet.ts` 扫描 alpha>8 的包围盒，整图全透明或画布受污染时退回原图。
+- `spriteSourceSize` = 裁剪区域在原图中的偏移；`trimmed` = 裁剪前后尺寸是否不同。
+- 修改 `vite.config.ts` 或 `server/` 后 tsx watch 会自动重启；端口占用可用 `bash scripts/dev.sh` 重拉。
+- `server/vite.ts` 中 `createViteServer` 必须 `configFile: false`（否则 vite.config 被加载两次，React 插件重复注册导致模块转换失败）。
+- `server/server.ts` 的全局错误处理器必须保持 4 参签名 `(err, req, res, next)`。
+- pnpm 严格布局下 `@vitejs/plugin-react` 构建时需要显式安装 `@babel/preset-typescript`（已在 devDependencies）。
