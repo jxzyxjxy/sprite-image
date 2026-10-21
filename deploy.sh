@@ -31,6 +31,7 @@ export COZE_PROJECT_ENV="PROD"
 export PORT HOST
 
 log() { echo -e "\033[1;32m[deploy]\033[0m $*"; }
+warn() { echo -e "\033[1;33m[deploy WARN]\033[0m $*"; }
 err() { echo -e "\033[1;31m[deploy ERROR]\033[0m $*" >&2; }
 trap 'err "部署失败（第 $LINENO 行）"' ERR
 
@@ -91,19 +92,27 @@ if ! command -v pm2 >/dev/null 2>&1; then
 fi
 
 log "通过 PM2 启动/热重载 ${APP_NAME}（端口 ${PORT}）..."
+
+# 确保进程处于 online 状态。
+# PM2 残留记录（例如历史崩溃循环导致的 "Process with pid already exists"）
+# 会使 reload 被静默跳过，此时清理记录后重建进程。
+ensure_online() {
+  if pm2 describe "${APP_NAME}" 2>/dev/null | grep -q "status.*online"; then
+    return 0
+  fi
+  warn "进程未处于 online 状态，清理 PM2 残留记录后重新启动..."
+  pm2 delete "${APP_NAME}" >/dev/null 2>&1 || true
+  sleep 1
+  pm2 start ecosystem.config.cjs --only "${APP_NAME}" --update-env
+  sleep 2
+  pm2 describe "${APP_NAME}" 2>/dev/null | grep -q "status.*online"
+}
+
 # startOrReload：首次启动，已在运行则零停机重载（名称相同即视为同一应用）
 # --update-env：确保 ecosystem 中环境变量（如 PORT）的改动对已存在进程生效
 pm2 startOrReload ecosystem.config.cjs --update-env || true
-
-# 确认进程进入 online 状态；PM2 残留记录（例如历史崩溃循环导致的
-# "Process with pid already exists"）会使 reload 被跳过，此时清理记录后重建
 sleep 2
-if ! pm2 describe "${APP_NAME}" 2>/dev/null | grep -q "status.*online"; then
-  warn "进程未进入 online 状态，清理 PM2 残留记录后重新启动..."
-  pm2 delete "${APP_NAME}" >/dev/null 2>&1 || true
-  pm2 start ecosystem.config.cjs --only "${APP_NAME}" --update-env
-  sleep 2
-fi
+ensure_online || true
 
 log "保存 PM2 进程列表并配置开机自启..."
 pm2 save
@@ -111,19 +120,28 @@ pm2 save
 pm2 startup | tail -n 1 || true
 
 # ---------------------------------------------------------------------------
-# 4. 健康检查（失败时输出诊断信息，避免“部署完成但无法访问”）
+# 4. 健康检查（失败时自动再自愈一次，仍失败则输出诊断信息）
 # ---------------------------------------------------------------------------
-log "等待服务健康检查（http://127.0.0.1:${PORT}/api/health）..."
-healthy=0
-for _ in $(seq 1 15); do
-  if curl -sf --max-time 2 "http://127.0.0.1:${PORT}/api/health" >/dev/null 2>&1; then
-    healthy=1
-    break
-  fi
-  sleep 1
-done
+check_health() {
+  local i
+  for i in $(seq 1 15); do
+    if curl -sf --max-time 2 "http://127.0.0.1:${PORT}/api/health" >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 1
+  done
+  return 1
+}
 
-if [ "$healthy" = "1" ]; then
+log "等待服务健康检查（http://127.0.0.1:${PORT}/api/health）..."
+if ! check_health; then
+  warn "首轮健康检查未通过，再次清理重建进程后重试..."
+  pm2 delete "${APP_NAME}" >/dev/null 2>&1 || true
+  sleep 1
+  pm2 start ecosystem.config.cjs --only "${APP_NAME}" --update-env || true
+fi
+
+if check_health; then
   log "部署完成 ✓ 服务已通过健康检查"
   log "访问地址: http://<服务器IP>:${PORT}（请确认防火墙/安全组已放行该端口）"
 else
@@ -133,8 +151,9 @@ else
   echo "----- 端口 ${PORT} 监听状态 -----"
   ss -tlnp 2>/dev/null | grep -E ":${PORT}[[:space:]]" || echo "（无任何进程监听 ${PORT}，进程可能已崩溃或处于重启循环）"
   echo "----- 排查建议 -----"
-  echo "1) 查看完整日志: pm2 logs ${APP_NAME}"
-  echo "2) 前台直跑让报错直接显示: PM2=0 SKIP_BUILD=1 bash deploy.sh"
+  echo "1) 确认代码为最新版本: git log --oneline -1（不是最新则执行 PULL=1 bash deploy.sh）"
+  echo "2) 查看完整日志: pm2 logs ${APP_NAME}"
+  echo "3) 前台直跑让报错直接显示: PM2=0 SKIP_BUILD=1 bash deploy.sh"
   exit 1
 fi
 
