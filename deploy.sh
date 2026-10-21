@@ -6,10 +6,10 @@
 #   bash deploy.sh                 # 安装依赖 + 构建 + 用 PM2 启动/热重载
 #   PM2=0 bash deploy.sh           # 构建后直接前台运行（不用 PM2，便于调试）
 #   PULL=1 bash deploy.sh          # 部署前先执行 git pull
-#   PORT=8080 bash deploy.sh       # 指定服务端口（默认 5000）
+#   PORT=8080 bash deploy.sh       # 指定服务端口（默认 3000）
 #
 # 可选环境变量:
-#   PORT          服务监听端口（默认 5000）
+#   PORT          服务监听端口（默认 3000）
 #   HOST          监听地址（默认 0.0.0.0，对外提供服务无需修改）
 #   PM2=0         禁用 PM2，前台直接运行
 #   PULL=1        部署前拉取最新代码
@@ -21,7 +21,7 @@ set -Eeuo pipefail
 cd "$(dirname "$0")"
 
 APP_NAME="sprite-sheet-tool"
-PORT="${PORT:-5000}"
+PORT="${PORT:-3000}"
 HOST="${HOST:-0.0.0.0}"
 USE_PM2="${PM2:-1}"
 DO_PULL="${PULL:-0}"

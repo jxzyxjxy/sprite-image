@@ -22,7 +22,7 @@ module.exports = {
       env: {
         NODE_ENV: 'production',
         COZE_PROJECT_ENV: 'PROD',
-        PORT: process.env.PORT || 5000,
+        PORT: process.env.PORT || 3000,
         HOST: process.env.HOST || '0.0.0.0',
       },
       // 异常退出自动拉起

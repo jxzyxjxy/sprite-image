@@ -28,12 +28,12 @@ pnpm run dev
 pnpm run build
 
 # 本地以生产模式运行构建产物
-COZE_PROJECT_ENV=PROD PORT=5000 node dist-server/server.js
+COZE_PROJECT_ENV=PROD PORT=3000 node dist-server/server.js
 ```
 
 ## 服务器部署（PM2 / 一键脚本）
 
-服务端是一个极简 Express 进程：生产模式下（环境变量 `COZE_PROJECT_ENV=PROD`）托管 `dist/` 静态文件，图片处理仍全部在浏览器完成。监听端口取 `PORT`（默认 5000），监听地址取 `HOST`（默认 `0.0.0.0`）。
+服务端是一个极简 Express 进程：生产模式下（环境变量 `COZE_PROJECT_ENV=PROD`）托管 `dist/` 静态文件，图片处理仍全部在浏览器完成。监听端口取 `PORT`（deploy.sh / PM2 配置默认 3000），监听地址取 `HOST`（默认 `0.0.0.0`）。
 
 ### 方式一：一键部署脚本（推荐）
 
@@ -72,7 +72,7 @@ PORT=8080 pm2 restart ecosystem.config.cjs --update-env  # 改端口
 
 ```bash
 pnpm install && pnpm run build
-COZE_PROJECT_ENV=PROD PORT=5000 HOST=0.0.0.0 node dist-server/server.js
+COZE_PROJECT_ENV=PROD PORT=3000 HOST=0.0.0.0 node dist-server/server.js
 ```
 
 建议前置 Nginx 反向代理并配置 HTTPS：
@@ -85,7 +85,7 @@ server {
     client_max_body_size 50m;   # 本工具图片不上传服务器，仅为常规保险
 
     location / {
-        proxy_pass http://127.0.0.1:5000;
+        proxy_pass http://127.0.0.1:3000;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
