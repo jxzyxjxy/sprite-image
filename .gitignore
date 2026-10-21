@@ -143,3 +143,6 @@ node-compile-cache/
 .vite/
 .coze-logs
 .codegraph/
+
+# Sandbox uploaded assets
+/assets/
