@@ -8,7 +8,9 @@ import { setupVite } from './vite';
 
 const isDev = process.env.COZE_PROJECT_ENV !== 'PROD';
 const port = parseInt(process.env.PORT || '5000', 10);
-const hostname = process.env.HOSTNAME || 'localhost';
+// 注意：不要使用 process.env.HOSTNAME，该变量在 Linux 上由系统预置为主机名，
+// 会导致服务绑定到无效地址。部署时通过 HOST 环境变量指定监听网卡。
+const hostname = process.env.HOST || '0.0.0.0';
 const app = express();
 // 使用 http.createServer 包装 Express app，以便支持 WebSocket 等协议升级
 const server = createServer(app);

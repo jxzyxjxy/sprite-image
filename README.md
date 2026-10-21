@@ -15,18 +15,84 @@
 
 ## 快速开始
 
+> 本项目使用 **pnpm**（`package.json` 已通过 `preinstall` 限定包管理器，npm/yarn 会被拒绝）。Node.js 建议 20+（沙箱使用 Node 24）。
+
 ```bash
-# 安装依赖（Node.js >= 18）
-npm install
+# 安装依赖
+pnpm install
 
-# 启动开发服务器，默认 http://localhost:5173
-npm run dev
+# 启动开发服务器（Express + Vite 中间件 + HMR，默认 http://localhost:5000）
+pnpm run dev
 
-# 生产构建，输出到 dist/
-npm run build
+# 生产构建：Vite 构建前端到 dist/，tsup 打包服务端到 dist-server/
+pnpm run build
 
-# 本地预览构建产物
-npm run preview
+# 本地以生产模式运行构建产物
+COZE_PROJECT_ENV=PROD PORT=5000 node dist-server/server.js
+```
+
+## 服务器部署（PM2 / 一键脚本）
+
+服务端是一个极简 Express 进程：生产模式下（环境变量 `COZE_PROJECT_ENV=PROD`）托管 `dist/` 静态文件，图片处理仍全部在浏览器完成。监听端口取 `PORT`（默认 5000），监听地址取 `HOST`（默认 `0.0.0.0`）。
+
+### 方式一：一键部署脚本（推荐）
+
+服务器首次需要安装 Node.js 与 pnpm（`corepack enable && corepack prepare pnpm@latest --activate`），之后：
+
+```bash
+git clone https://github.com/jxzyxjxy/sprite-image.git
+cd sprite-image
+bash deploy.sh                 # 安装依赖 -> 构建 -> PM2 启动（首次会自动全局安装 pm2）
+
+# 后续更新
+git pull && bash deploy.sh
+# 或一步到位（脚本内置 git pull）
+PULL=1 bash deploy.sh
+
+# 常用变体
+PORT=8080 bash deploy.sh       # 指定端口
+PM2=0 bash deploy.sh           # 不用 PM2，前台运行（排查问题用）
+SKIP_BUILD=1 bash deploy.sh    # 跳过构建，仅用已有产物重启
+```
+
+脚本会自动执行 `pm2 save`，并打印 `pm2 startup` 的开机自启命令（按提示把那条 `sudo ...` 命令执行一次即可实现服务器重启后自动拉起）。
+
+### 方式二：手动使用 PM2
+
+```bash
+pnpm install
+pnpm run build
+pm2 start ecosystem.config.cjs          # 启动（名称 sprite-sheet-tool）
+pm2 logs sprite-sheet-tool              # 查看日志
+pm2 restart ecosystem.config.cjs --update-env   # 更新代码重新 build 后重启
+PORT=8080 pm2 restart ecosystem.config.cjs --update-env  # 改端口
+```
+
+### 方式三：不用 PM2（systemd / 裸 node）
+
+```bash
+pnpm install && pnpm run build
+COZE_PROJECT_ENV=PROD PORT=5000 HOST=0.0.0.0 node dist-server/server.js
+```
+
+建议前置 Nginx 反向代理并配置 HTTPS：
+
+```nginx
+server {
+    listen 80;
+    server_name your-domain.com;
+
+    client_max_body_size 50m;   # 本工具图片不上传服务器，仅为常规保险
+
+    location / {
+        proxy_pass http://127.0.0.1:5000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
 ```
 
 ## JSON 格式说明
