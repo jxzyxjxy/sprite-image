@@ -92,13 +92,51 @@ fi
 
 log "通过 PM2 启动/热重载 ${APP_NAME}（端口 ${PORT}）..."
 # startOrReload：首次启动，已在运行则零停机重载（名称相同即视为同一应用）
-pm2 startOrReload ecosystem.config.cjs --update-env
+# --update-env：确保 ecosystem 中环境变量（如 PORT）的改动对已存在进程生效
+pm2 startOrReload ecosystem.config.cjs --update-env || true
+
+# 确认进程进入 online 状态；PM2 残留记录（例如历史崩溃循环导致的
+# "Process with pid already exists"）会使 reload 被跳过，此时清理记录后重建
+sleep 2
+if ! pm2 describe "${APP_NAME}" 2>/dev/null | grep -q "status.*online"; then
+  warn "进程未进入 online 状态，清理 PM2 残留记录后重新启动..."
+  pm2 delete "${APP_NAME}" >/dev/null 2>&1 || true
+  pm2 start ecosystem.config.cjs --only "${APP_NAME}" --update-env
+  sleep 2
+fi
 
 log "保存 PM2 进程列表并配置开机自启..."
 pm2 save
 # 输出开机自启命令（不同系统 init 不同，需人工执行一次返回的 sudo 命令）
 pm2 startup | tail -n 1 || true
 
-log "部署完成 ✓"
+# ---------------------------------------------------------------------------
+# 4. 健康检查（失败时输出诊断信息，避免“部署完成但无法访问”）
+# ---------------------------------------------------------------------------
+log "等待服务健康检查（http://127.0.0.1:${PORT}/api/health）..."
+healthy=0
+for _ in $(seq 1 15); do
+  if curl -sf --max-time 2 "http://127.0.0.1:${PORT}/api/health" >/dev/null 2>&1; then
+    healthy=1
+    break
+  fi
+  sleep 1
+done
+
+if [ "$healthy" = "1" ]; then
+  log "部署完成 ✓ 服务已通过健康检查"
+  log "访问地址: http://<服务器IP>:${PORT}（请确认防火墙/安全组已放行该端口）"
+else
+  err "健康检查未通过：服务未正常监听 ${PORT} 端口，诊断信息如下"
+  echo "----- pm2 错误日志（最近 20 行）-----"
+  pm2 logs "${APP_NAME}" --err --lines 20 --nostream 2>/dev/null || true
+  echo "----- 端口 ${PORT} 监听状态 -----"
+  ss -tlnp 2>/dev/null | grep -E ":${PORT}[[:space:]]" || echo "（无任何进程监听 ${PORT}，进程可能已崩溃或处于重启循环）"
+  echo "----- 排查建议 -----"
+  echo "1) 查看完整日志: pm2 logs ${APP_NAME}"
+  echo "2) 前台直跑让报错直接显示: PM2=0 SKIP_BUILD=1 bash deploy.sh"
+  exit 1
+fi
+
 log "查看日志: pm2 logs ${APP_NAME}"
 log "进程状态: pm2 status"
